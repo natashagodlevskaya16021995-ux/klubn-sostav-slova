@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Играй и учи</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --pink: #ff6b93;
+      --pink2: #ff99b4;
+      --yellow: #ffe066;
+      --text-dark: #4a3b32;
+      --shadow: 0 18px 55px rgba(255, 107, 147, 0.15);
+      --open-heart: clamp(150px, 22vmin, 190px);
+      --note-w: min(600px, calc(100vw - 40px));
+      --note-max: 720px;
+      --split-ms: 520ms;
+      --note-fade-ms: 220ms;
+      --note-move-ms: 260ms;
+    }
+
+    *{box-sizing:border-box;}
+    html,body{height:100%;}
+    body{
+      margin:0;
+      font-family:"Roboto Condensed", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      overflow:hidden;
+      background:#fff5f7;
+      color: var(--text-dark);
+      touch-action: manipulation;
+    }
+
+    .bg{
+      position:fixed; inset:0;
+      background: url("images/bg.png") center/cover no-repeat;
+      transform: scale(1.02);
+    }
+    .bg::after{
+      content:"";
+      position:absolute; inset:0;
+      background:
+        radial-gradient(1200px 700px at 50% 10%, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0)),
+        linear-gradient(180deg, rgba(255, 245, 247, 0.4), rgba(255, 245, 247, 0.8));
+      pointer-events:none;
+    }
+
+    .counter{
+      position:fixed;
+      top:16px;
+      right:16px;
+      z-index:60;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border-radius:999px;
+      background: rgba(255, 255, 255, 0.7);
+      border:1px solid rgba(255, 107, 147, 0.2);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 14px 30px rgba(255, 107, 147, 0.1);
+      user-select:none;
+      font-weight:700;
+      font-size:16px;
+      letter-spacing:.2px;
+      color: var(--text-dark);
+    }
+    .dot{
+      width:12px;height:12px;border-radius:50%;
+      background: linear-gradient(180deg, var(--pink2), var(--pink));
+      box-shadow: 0 0 0 4px rgba(255, 107, 147, 0.2);
+    }
+
+    .screen{
+      position:fixed;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      opacity:0;
+      transform: translateY(10px);
+      pointer-events:none;
+      transition: opacity .45s ease, transform .45s ease;
+      z-index:10;
+    }
+    .screen.active{
+      opacity:1;
+      transform: translateY(0);
+      pointer-events:auto;
+    }
+
+    .startCard, .doneCard {
+      width:min(720px, calc(100vw - 40px));
+      border-radius: 28px;
+      background: rgba(255, 255, 255, 0.85);
+      border: 2px solid rgba(255, 107, 147, 0.2);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 20px 50px rgba(255, 107, 147, 0.15);
+      padding: 40px 30px;
+      text-align:center;
+      position:relative;
+      overflow:hidden;
+    }
+    .startCard::before, .doneCard::before{
+      content:"";
+      position:absolute; inset:-40%;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255, 153, 180, 0.2), transparent 55%),
+        radial-gradient(circle at 75% 35%, rgba(255, 224, 102, 0.2), transparent 55%),
+        radial-gradient(circle at 55% 85%, rgba(255, 107, 147, 0.15), transparent 60%);
+      transform: rotate(10deg);
+      pointer-events:none;
+    }
+    
+    .startCard h1, .doneCard h2 {
+      margin:0 0 18px;
+      color: #d64573;
+      position:relative;
+      letter-spacing:.3px;
+      font-weight:700;
+    }
+    .startCard h1 { font-size: clamp(30px, 4.2vw, 42px); }
+    .doneCard h2 { font-size: clamp(26px, 3.5vw, 36px); }
+    
+    .doneCard p {
+      font-size: 20px;
+      margin-bottom: 25px;
+      font-weight: 400;
+    }
+
+    .btn{
+      appearance:none;
+      border:0;
+      cursor:pointer;
+      border-radius:999px;
+      padding:14px 24px;
+      font-weight:800;
+      font-size: 18px;
+      letter-spacing:.3px;
+      transition: transform .15s ease, filter .2s ease;
+      user-select:none;
+      font-family: inherit;
+      outline:none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active{ transform: translateY(1px) scale(.99); }
+    
+    .btnPrimary{
+      background: linear-gradient(180deg, var(--pink2), var(--pink));
+      color:#fff;
+      box-shadow: 0 12px 25px rgba(255, 107, 147, 0.35);
+      border: 2px solid #ff4f81;
+    }
+    .btnPrimary:hover{ filter:brightness(1.05) saturate(1.1); }
+
+    .field{
+      position:fixed;
+      inset:0;
+      z-index:1;
+    }
+
+    .heartBtn{
+      position:absolute;
+      border:0;
+      padding:0;
+      background:transparent;
+      cursor:pointer;
+      opacity:0;
+      transform: translateY(10px) scale(.96);
+      animation: fadeInUp .5s ease forwards;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      outline: none !important;
+      box-shadow: none !important;
+      z-index:2;
+    }
+    .field.locked .heartBtn{ pointer-events:none; }
+    .field.locked .heartBtn.open,
+    .field.locked .heartBtn.opening,
+    .field.locked .heartBtn.closing{ pointer-events:auto; }
+
+    .heartBtn.open,
+    .heartBtn.opening,
+    .heartBtn.closing{ z-index:50; }
+
+    @keyframes fadeInUp{
+      to{ opacity:1; transform: translateY(0) scale(1); }
+    }
+
+    .heartImg{
+      position:relative;
+      z-index:1;
+      width:100%;
+      height:100%;
+      background: url("images/serd.png") center/contain no-repeat;
+      filter: drop-shadow(0 14px 18px rgba(255, 107, 147, 0.25));
+      transition: transform .18s ease, filter .18s ease, opacity .12s ease;
+    }
+
+    .heartBtn:hover .heartImg{
+      transform: translateY(-3px) scale(1.04);
+      filter:
+        drop-shadow(0 14px 18px rgba(255, 107, 147, 0.25))
+        drop-shadow(0 0 10px rgba(255, 224, 102, 0.6))
+        drop-shadow(0 0 20px rgba(255, 107, 147, 0.4));
+    }
+    @media (hover:none){
+      .heartBtn:hover .heartImg{ transform:none; }
+    }
+
+    .heartBtn.opening .heartImg,
+    .heartBtn.open .heartImg,
+    .heartBtn.closing .heartImg{
+      opacity:0;
+      pointer-events:none;
+    }
+
+    .heartOpen{
+      position:absolute;
+      inset:0;
+      z-index:2;
+      pointer-events:none;
+      opacity:0;
+      transition: opacity .12s ease;
+    }
+    .heartBtn.opening .heartOpen,
+    .heartBtn.open .heartOpen,
+    .heartBtn.closing .heartOpen{ opacity:1; }
+
+    .openWrap{
+      position:absolute;
+      left:50%;
+      top:50%;
+      transform: translate(-50%,-50%);
+      width: min(var(--note-w), var(--note-max));
+      pointer-events:none;
+      z-index:2;
+    }
+
+    .message{
+      width:100%;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.98);
+      color: var(--text-dark);
+      border: 2px solid rgba(255, 107, 147, 0.2);
+      box-shadow: 0 20px 46px rgba(255, 107, 147, 0.15);
+      padding: 30px 24px 24px;
+      text-align:center;
+      opacity:0;
+      transform: translateY(10px) scale(.975);
+      transition:
+        opacity var(--note-fade-ms) ease,
+        transform var(--note-move-ms) cubic-bezier(.2,.9,.2,1);
+      pointer-events:none; /* ИСПРАВЛЕНИЕ: карточка не перехватывает клики пока невидима */
+      position:relative;
+      z-index:2;
+      display: flex;
+      flex-direction: column;
+      max-height: 85vh;
+    }
+
+    .msgClose {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      background: transparent;
+      border: none;
+      font-size: 28px;
+      color: #ff99b4;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+      transition: color 0.2s;
+    }
+    .msgClose:hover { color: #ff6b93; }
+
+    .heartBtn.opening .message,
+    .heartBtn.open .message{
+      opacity:1;
+      transform: translateY(0) scale(1);
+      pointer-events:auto; /* Включаем клики только для открытой карточки */
+    }
+
+    .heartBtn.closing .message{
+      opacity:0;
+      transform: translateY(10px) scale(.975);
+    }
+
+    .qText{
+      margin: 0 0 16px 0;
+      font-size: 22px;
+      line-height: 1.3;
+      font-weight: 700;
+      color: #d64573;
+      overflow-y: auto;
+      /* Скрываем скроллбар для текста вопроса */
+      scrollbar-width: none; 
+      -ms-overflow-style: none; 
+    }
+    .qText::-webkit-scrollbar { display: none; }
+
+    .optionsList {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+      padding: 4px;
+      /* Скрываем скроллбар для списка ответов */
+      scrollbar-width: none; 
+      -ms-overflow-style: none; 
+    }
+    .optionsList::-webkit-scrollbar { display: none; }
+
+    .optBtn {
+      appearance: none;
+      border: 2px solid rgba(255, 107, 147, 0.2);
+      background: #fff;
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-size: 18px;
+      font-family: inherit;
+      color: var(--text-dark);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+      line-height: 1.3;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+    }
+    
+    .optBtn:hover {
+      background: rgba(255, 107, 147, 0.05);
+      border-color: rgba(255, 107, 147, 0.5);
+      transform: translateY(-2px);
+    }
+    
+    .optBtn.correct {
+      background: #e6ffed;
+      border-color: #34d058;
+      color: #176f2c;
+      transform: scale(1.02);
+      box-shadow: 0 8px 15px rgba(52, 208, 88, 0.2);
+    }
+    
+    .optBtn.wrong {
+      background: #ffeef0;
+      border-color: #ff6b93;
+      color: #d64573;
+      animation: shake 0.4s ease;
+    }
+    
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-6px); }
+      75% { transform: translateX(6px); }
+    }
+
+    .half{
+      position:absolute;
+      top:50%;
+      width: calc(var(--open-heart) / 2);
+      height: var(--open-heart);
+      overflow:hidden;
+      z-index:3;
+      filter: drop-shadow(0 18px 22px rgba(255, 107, 147, 0.2));
+      will-change: transform;
+      transition: transform var(--split-ms) cubic-bezier(.2,.9,.2,1);
+      pointer-events:none;
+    }
+
+    .half.left{
+      left:50%;
+      transform: translate(-100%, -50%);
+    }
+    .half.right{
+      left:50%;
+      transform: translate(0, -50%);
+    }
+
+    .halfImg{
+      position:absolute;
+      top:0;
+      width: var(--open-heart);
+      height: var(--open-heart);
+      background: url("images/serd.png") center/contain no-repeat;
+    }
+    .half.left .halfImg{ left:0; }
+    .half.right .halfImg{ right:0; }
+
+    .heartBtn.open .openWrap .half.left,
+    .heartBtn.opening .openWrap .half.left{
+      left:0;
+      transform: translate(-100%, -50%);
+    }
+    .heartBtn.open .openWrap .half.right,
+    .heartBtn.opening .openWrap .half.right{
+      left:auto;
+      right:0;
+      transform: translate(100%, -50%);
+    }
+
+    .heartBtn.closing .openWrap .half.left{
+      left:50%;
+      right:auto;
+      transform: translate(-100%, -50%);
+    }
+    .heartBtn.closing .openWrap .half.right{
+      left:50%;
+      right:auto;
+      transform: translate(0, -50%);
+    }
+
+    .doneOverlay{
+      position:fixed; inset:0;
+      z-index:200;
+      opacity:0;
+      pointer-events:none;
+      transition: opacity .25s ease;
+    }
+    .doneOverlay.active{ opacity:1; pointer-events:auto; }
+    
+    .dim{
+      position:absolute; inset:0;
+      background: rgba(255, 245, 247, 0.7);
+      backdrop-filter: blur(5px);
+    }
+    .doneCard{
+      position:absolute;
+      left:50%; top:50%;
+      transform: translate(-50%,-50%);
+    }
+
+    .finImage {
+      max-width: 180px;
+      height: auto;
+      margin: 0 auto 20px auto;
+      display: block;
+      position: relative;
+      animation: pulseGlow 2s infinite alternate ease-in-out;
+    }
+    
+    @keyframes pulseGlow {
+      0% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 10px rgba(255, 107, 147, 0.4));
+      }
+      100% {
+        transform: scale(1.08);
+        filter: drop-shadow(0 0 25px rgba(255, 224, 102, 0.8)) drop-shadow(0 0 15px rgba(255, 107, 147, 0.6));
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg"></div>
+
+  <div class="counter" aria-live="polite">
+    <span class="dot"></span>
+    <span><span id="doneCount">0</span>/<span id="totalCount">0</span></span>
+  </div>
+
+  <section class="screen active" id="startScreen">
+    <div class="startCard">
+      <h1>Состав слова</h1>
+      <button class="btn btnPrimary" id="startBtn">Начать</button>
+    </div>
+  </section>
+
+  <section class="screen" id="gameScreen" style="align-items:stretch; justify-content:stretch;">
+    <div class="field" id="field" aria-label="Игровое поле с сердечками"></div>
+
+    <div class="doneOverlay" id="doneOverlay" aria-hidden="true">
+      <div class="dim"></div>
+      <div class="doneCard">
+        <img src="images/fin.png" class="finImage" alt="Победа!">
+        <h2>Отлично!</h2>
+        <p>Угощайся клубникой 🍓</p>
+        <button class="btn btnPrimary" id="againBtn">Играть снова</button>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const QUIZ_DATA = [
+      {
+        q: "Что такое корень слова?",
+        options: [
+          "изменяемая часть слова",
+          "общая часть родственных слов, в которой передаётся их основное значение",
+          "часть слова, в которой находится ударный слог",
+          "всё слово без окончания"
+        ],
+        correct: 1
+      },
+      {
+        q: "Что такое окончание?",
+        options: [
+          "изменяемая часть слова",
+          "часть слова, которая стоит после корня",
+          "неизменяемая часть слова",
+          "последняя буква в слове"
+        ],
+        correct: 0
+      },
+      {
+        q: "Что нужно сделать, чтобы найти корень?",
+        options: [
+          "изменить форму слова",
+          "подобрать однокоренные слова"
+        ],
+        correct: 1
+      },
+      {
+        q: "Что такое приставка?",
+        options: [
+          "часть слова, которая стоит после корня и служит для образования новых слов",
+          "часть слова, которая стоит после окончания",
+          "часть слова, которая стоит перед окончанием",
+          "часть слова, которая стоит перед корнем и служит для образования новых слов"
+        ],
+        correct: 3
+      },
+      {
+        q: "Изменяемая часть слова, которая служит для связи слов в предложении, называется …",
+        options: [
+          "корень",
+          "приставка",
+          "окончание",
+          "суффикс"
+        ],
+        correct: 2
+      },
+      {
+        q: "Что нужно сделать, чтобы найти окончание?",
+        options: [
+          "изменить форму слова",
+          "подобрать однокоренные слова"
+        ],
+        correct: 0
+      },
+      {
+        q: "Часть слова, которая стоит перед корнем и служит для образования слов, называется …",
+        options: [
+          "корень",
+          "приставка",
+          "окончание",
+          "суффикс"
+        ],
+        correct: 1
+      },
+      {
+        q: "Часть слова, которая стоит за корнем и служит для образования слов, называется …",
+        options: [
+          "корень",
+          "приставка",
+          "окончание",
+          "суффикс"
+        ],
+        correct: 3
+      },
+      {
+        q: "Что не является частью слова?",
+        options: [
+          "приставка",
+"суффикс",
+          "предлог",
+"окончание"
+     ],
+        correct: 2
+      }
+    ];
+
+    const startScreen = document.getElementById('startScreen');
+    const gameScreen  = document.getElementById('gameScreen');
+    const startBtn    = document.getElementById('startBtn');
+    const field = document.getElementById('field');
+    const doneCountEl = document.getElementById('doneCount');
+    const totalCountEl = document.getElementById('totalCount');
+    const doneOverlay = document.getElementById('doneOverlay');
+    const againBtn = document.getElementById('againBtn');
+
+    let openedIndex = null;
+    let openedBtn = null;
+    let completed = new Set();
+
+    function switchScreen(from, to){
+      from.classList.remove('active');
+      to.classList.add('active');
+    }
+
+    function rand(min, max){ return Math.random() * (max - min) + min; }
+    function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+
+    function updateCounter(){
+      doneCountEl.textContent = String(completed.size);
+      totalCountEl.textContent = String(QUIZ_DATA.length);
+    }
+
+    function buildHeartButton(index, size){
+      const btn = document.createElement('button');
+      btn.className = 'heartBtn';
+      btn.type = 'button';
+      btn.setAttribute('aria-label', `Сердечко ${index+1}`);
+      btn.style.width = size + "px";
+      btn.style.height = size + "px";
+
+      const img = document.createElement('div');
+      img.className = 'heartImg';
+
+      const open = document.createElement('div');
+      open.className = 'heartOpen';
+
+      const wrap = document.createElement('div');
+      wrap.className = 'openWrap';
+
+      const left = document.createElement('div');
+      left.className = 'half left';
+      left.innerHTML = '<div class="halfImg"></div>';
+
+      const right = document.createElement('div');
+      right.className = 'half right';
+      right.innerHTML = '<div class="halfImg"></div>';
+
+      const msg = document.createElement('div');
+      msg.className = 'message';
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'msgClose';
+      closeBtn.innerHTML = '&times;';
+      closeBtn.type = 'button';
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeHeart();
+      });
+
+      const text = document.createElement('p');
+      text.className = 'qText';
+      
+      const optsContainer = document.createElement('div');
+      optsContainer.className = 'optionsList';
+
+      const qData = QUIZ_DATA[index];
+      text.textContent = qData.q;
+
+      qData.options.forEach((optText, optIdx) => {
+        const opt = document.createElement('button');
+        opt.className = 'optBtn';
+        opt.textContent = optText;
+        opt.addEventListener('click', (e) => {
+           e.stopPropagation();
+           
+           if (optIdx === qData.correct) {
+             opt.classList.add('correct');
+             Array.from(optsContainer.children).forEach(b => b.style.pointerEvents = 'none');
+             setTimeout(() => closeHeart(true), 800);
+           } else {
+             opt.classList.add('wrong');
+             setTimeout(() => opt.classList.remove('wrong'), 400);
+           }
+        });
+        optsContainer.appendChild(opt);
+      });
+
+      msg.appendChild(closeBtn);
+      msg.appendChild(text);
+      msg.appendChild(optsContainer);
+
+      wrap.appendChild(left);
+      wrap.appendChild(right);
+      wrap.appendChild(msg);
+      open.appendChild(wrap);
+
+      btn.appendChild(img);
+      btn.appendChild(open);
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openHeart(index, btn);
+      });
+
+      return btn;
+    }
+
+    function getSafePadding(){
+      const vw = field.clientWidth;
+      const vh = field.clientHeight;
+
+      const noteW = Math.min(600, Math.max(240, vw - 40));
+      const styles = getComputedStyle(document.documentElement);
+      const openHeart = parseFloat(styles.getPropertyValue('--open-heart')) || 180;
+
+      const openW = noteW + openHeart;
+      const padX = Math.ceil(openW / 2);
+      const padY = 180;
+
+      return {
+        padLeft: clamp(padX, 24, Math.floor(vw * 0.45)),
+        padRight: clamp(padX, 24, Math.floor(vw * 0.45)),
+        padTop: clamp(padY, 90, Math.floor(vh * 0.45)),
+        padBottom: clamp(padY, 90, Math.floor(vh * 0.45))
+      };
+    }
+
+    function placeHeartsRandomly(){
+      field.innerHTML = "";
+      const count = QUIZ_DATA.length;
+      const placed = [];
+
+      const vw = field.clientWidth;
+      const vh = field.clientHeight;
+
+      const topSafe = 70;
+      const pads = getSafePadding();
+
+      for(let i=0;i<count;i++){
+        const size = rand(72, Math.min(110, vw * 0.22));
+        const btn = buildHeartButton(i, size);
+        btn.style.animationDelay = (45 * Math.min(i, 14)) + "ms";
+
+        const maxTries = 1800;
+        let x=0, y=0, ok=false;
+
+        const minX = Math.max(14, pads.padLeft);
+        const maxX = Math.max(minX + 1, vw - pads.padRight - size);
+        const minY = Math.max(topSafe, pads.padTop);
+        const maxY = Math.max(minY + 1, vh - pads.padBottom - size);
+
+        const rA = size * 0.44;
+        const boxPad = 12;
+
+        for(let t=0;t<maxTries;t++){
+          x = rand(minX, maxX);
+          y = rand(minY, maxY);
+
+          ok = true;
+          const ax = x + size/2, ay = y + size/2;
+
+          for(const p of placed){
+            const bx = p.x + p.s/2, by = p.y + p.s/2;
+            const rB = p.s * 0.44;
+            const d = Math.hypot(ax - bx, ay - by);
+
+            if(d < (rA + rB + boxPad)) { ok = false; break; }
+
+            if(
+              x < p.x + p.s + boxPad &&
+              x + size + boxPad > p.x &&
+              y < p.y + p.s + boxPad &&
+              y + size + boxPad > p.y
+            ){
+              ok = false; break;
+            }
+          }
+          if(ok) break;
+        }
+
+        x = clamp(x, minX, maxX);
+        y = clamp(y, minY, maxY);
+
+        btn.style.left = x + "px";
+        btn.style.top  = y + "px";
+
+        placed.push({x, y, s: size});
+        field.appendChild(btn);
+      }
+    }
+
+    function lockField(){ field.classList.add('locked'); }
+    function unlockField(){ field.classList.remove('locked'); }
+
+    function openHeart(index, btnEl){
+      if(completed.has(index)) return;
+      if(openedBtn) return;
+
+      openedIndex = index;
+      openedBtn = btnEl;
+
+      lockField();
+      btnEl.classList.remove('closing');
+      btnEl.classList.add('opening');
+
+      requestAnimationFrame(() => {
+        btnEl.classList.add('open');
+      });
+    }
+
+    function closeHeart(isSolved = false){
+      if(openedIndex === null || !openedBtn) return;
+
+      const idx = openedIndex;
+      const btnEl = openedBtn;
+
+      btnEl.classList.remove('open');
+      btnEl.classList.remove('opening');
+      btnEl.classList.add('closing');
+
+      const CLOSE_ANIM_MS = 540;
+
+      window.setTimeout(() => {
+        
+        if (isSolved) {
+          btnEl.style.transition = "opacity .12s ease, transform .12s ease";
+          btnEl.style.opacity = "0";
+          btnEl.style.transform = "scale(.92)";
+          btnEl.style.pointerEvents = "none";
+          window.setTimeout(() => btnEl.remove(), 140);
+          
+          completed.add(idx);
+          updateCounter();
+        } else {
+          btnEl.classList.remove('closing');
+        }
+
+        openedIndex = null;
+        openedBtn = null;
+        unlockField();
+
+        if(completed.size === QUIZ_DATA.length){
+          window.setTimeout(() => {
+            doneOverlay.classList.add('active');
+            doneOverlay.setAttribute('aria-hidden','false');
+          }, 160);
+        }
+      }, CLOSE_ANIM_MS);
+    }
+
+    function resetGame(){
+      completed = new Set();
+      openedIndex = null;
+      openedBtn = null;
+      unlockField();
+
+      doneOverlay.classList.remove('active');
+      doneOverlay.setAttribute('aria-hidden','true');
+
+      updateCounter();
+      placeHeartsRandomly();
+    }
+
+    startBtn.addEventListener('click', () => {
+      switchScreen(startScreen, gameScreen);
+      resetGame();
+    });
+
+    againBtn.addEventListener('click', () => resetGame());
+
+    document.addEventListener('keydown', (e) => {
+      if(e.key === "Escape" && openedBtn) closeHeart(false);
+    });
+
+    window.addEventListener('resize', () => {
+      if(gameScreen.classList.contains('active') && !openedBtn) placeHeartsRandomly();
+    });
+
+    updateCounter();
+  </script>
+</body>
+</html>
